@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Data;
@@ -32,6 +34,37 @@ namespace WebApi.Controllers
         public async Task<ActionResult<IEnumerable<ProjectItem>>> GetInProgressProjectItems()
         {
             return await _projectItemRepository.GetInProgressItemsAsync();
+        }
+
+        [HttpGet("inProgress/xls")]
+        public async Task<IActionResult> GetInProgressExcel()
+        {
+            var items = await _projectItemRepository.GetInProgressItemsAsync();
+
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("In progress tasks");
+                var currentRow = 1;
+                worksheet.Cell(currentRow, 1).Value = "Id";
+                worksheet.Cell(currentRow, 2).Value = "Name";
+                foreach (var item in items)
+                {
+                    currentRow++;
+                    worksheet.Cell(currentRow, 1).Value = item.Id;
+                    worksheet.Cell(currentRow, 2).Value = item.Name;
+                }
+
+                using (var stream = new MemoryStream())
+                {
+                    workbook.SaveAs(stream);
+                    var content = stream.ToArray();
+
+                    return File(
+                        content,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "users.xlsx");
+                }
+            }
         }
 
         // GET: api/ProjectItems/5
