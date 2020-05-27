@@ -26,6 +26,13 @@ namespace WebApi.Controllers
         {
             return await _projectItemRepository.GetItemsAsync();
         }
+               
+        // GET: api/ProjectItems/inProgress
+        [HttpGet("inProgress")]
+        public async Task<ActionResult<IEnumerable<ProjectItem>>> GetInProgressProjectItems()
+        {
+            return await _projectItemRepository.GetInProgressItemsAsync();
+        }
 
         // GET: api/ProjectItems/5
         [HttpGet("{id}")]

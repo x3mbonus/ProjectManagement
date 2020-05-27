@@ -9,6 +9,7 @@ namespace WebApi.Repositories
     public interface IProjectItemRepository
     {
         Task<List<ProjectItem>> GetItemsAsync();
+        Task<List<ProjectItem>> GetInProgressItemsAsync();
 
         Task<ProjectItem> FindByIdAsync(int id);
 

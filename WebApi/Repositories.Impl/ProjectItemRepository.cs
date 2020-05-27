@@ -22,6 +22,13 @@ namespace WebApi.Repositories.Impl
             return await _context.ProjectItems.ToListAsync();
         }
 
+        public async Task<List<ProjectItem>> GetInProgressItemsAsync()
+        {
+            return await _context.ProjectItems
+                .Where(x => x.State == State.InProgress)
+                .ToListAsync();
+        }
+
         public async Task<ProjectItem> FindByIdAsync(int id)
         {
             return await _context.ProjectItems.FindAsync(id);
@@ -29,7 +36,8 @@ namespace WebApi.Repositories.Impl
 
         public async Task<bool> UpdateItem(ProjectItem projectItem)
         {
-            if (!await IsParentValidAsync(projectItem))
+            var parent = await GetValidParentAsync(projectItem);
+            if (parent == null)
             {
                 return false;
             }
@@ -39,6 +47,8 @@ namespace WebApi.Repositories.Impl
             try
             {
                 await _context.SaveChangesAsync();
+
+                await UpdateProjectStatusesAsync(projectItem);
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -56,13 +66,15 @@ namespace WebApi.Repositories.Impl
 
         public async Task<int> CreateItemAsync(ProjectItem projectItem)
         {
-            if (!await IsParentValidAsync(projectItem))
+            var parent = await GetValidParentAsync(projectItem);
+            if (parent == null)
             {
                 return 0;
             }
 
             _context.ProjectItems.Add(projectItem);
             await _context.SaveChangesAsync();
+            await UpdateProjectStatusesAsync(projectItem);
 
             return projectItem.Id;
         }
@@ -76,7 +88,9 @@ namespace WebApi.Repositories.Impl
             }
 
             _context.ProjectItems.Remove(projectItem);
-            return await _context.SaveChangesAsync();
+            var result = await _context.SaveChangesAsync();
+            await UpdateProjectStatusesAsync(projectItem);
+            return result;
         }
 
         private bool ProjectItemExists(int id)
@@ -85,7 +99,7 @@ namespace WebApi.Repositories.Impl
         }
 
 
-        private async Task<bool> IsParentValidAsync(ProjectItem projectItem)
+        private async Task<ProjectItem> GetValidParentAsync(ProjectItem projectItem)
         {
             if (projectItem.ParentId.HasValue)
             {
@@ -99,13 +113,46 @@ namespace WebApi.Repositories.Impl
                 if (parent.Type == ItemType.Task &&
                     projectItem.Type == ItemType.Project)
                 {
-                    return false; //Project cann not be child of task
+                    return null; //Project cann not be child of task
                 }
 
                 //We need to check for cycles here too ...
                 //And all this logic better to exctract to some services layer
+
+                return parent;
             }
-            return true;
+            return null;       
+        }
+
+        private async Task UpdateProjectStatusesAsync(ProjectItem projectItem)
+        {
+            var commandText = @"
+                with tree (id, rootId, type, state) as 
+                    (select id, id, 0, 0 from projectItems where type = 0
+                    union all
+                    select p.id, t.rootId, p.type, p.state
+                    from projectItems p
+                        join tree t on t.id = p.ParentId
+                    ),
+
+                grouped (id, countCompleted, countInProgress, countAll) as
+                    (select rootId as id,  
+	                    sum(case when state = 2 then 1 else 0 end) as countCompleted,
+	                    sum(case when state = 1 then 1 else 0 end) as countInProgress,
+	                    sum(1) - 1 as countAll
+                    from tree
+                    where type = 1 or id = rootId
+                    group by rootId)
+
+                update projectItems
+                set state = case 
+                    when g.countCompleted > 0 and g.countCompleted = g.countAll then 2
+                    when g.countInProgress > 0 then 1
+                    else 0 end
+                from projectItems
+                join grouped g on g.id = projectItems.id";
+
+            await _context.Database.ExecuteSqlRawAsync(commandText);
         }
     }
 }
