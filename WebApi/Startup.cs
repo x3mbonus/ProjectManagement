@@ -35,6 +35,7 @@ namespace WebApi
                     Configuration.GetConnectionString("DefaultConnection")));
 
             services.AddScoped<IProjectItemRepository, ProjectItemRepository>();
+            services.AddScoped<IProjectStatusesService, ProjectStatusesService>();
 
             services.AddControllers();
 

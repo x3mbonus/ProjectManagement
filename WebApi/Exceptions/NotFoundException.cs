@@ -4,7 +4,7 @@ using System.Runtime.Serialization;
 namespace WebApi.Exceptions
 {
     [Serializable]
-    internal class NotFoundException : Exception
+    public class NotFoundException : Exception
     {
         public NotFoundException()
         {
