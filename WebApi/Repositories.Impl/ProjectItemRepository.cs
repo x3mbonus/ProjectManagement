@@ -29,7 +29,7 @@ namespace WebApi.Repositories.Impl
 
         public async Task<bool> UpdateItem(ProjectItem projectItem)
         {
-            if (!IsParentValidAsync(projectItem))
+            if (!await IsParentValidAsync(projectItem))
             {
                 return false;
             }
@@ -56,7 +56,7 @@ namespace WebApi.Repositories.Impl
 
         public async Task<int> CreateItemAsync(ProjectItem projectItem)
         {
-            if (!IsParentValidAsync(projectItem))
+            if (!await IsParentValidAsync(projectItem))
             {
                 return 0;
             }
@@ -85,7 +85,7 @@ namespace WebApi.Repositories.Impl
         }
 
 
-        private async bool IsParentValidAsync(ProjectItem projectItem)
+        private async Task<bool> IsParentValidAsync(ProjectItem projectItem)
         {
             if (projectItem.ParentId.HasValue)
             {
