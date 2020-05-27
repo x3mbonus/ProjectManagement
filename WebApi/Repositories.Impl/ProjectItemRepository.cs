@@ -17,18 +17,23 @@ namespace WebApi.Repositories.Impl
             _context = context;
         }
 
-        public async Task<IEnumerable<ProjectItem>> GetProjectItems()
+        public async Task<List<ProjectItem>> GetItemsAsync()
         {
             return await _context.ProjectItems.ToListAsync();
         }
 
-        public async Task<ProjectItem> GetProjectItem(int id)
+        public async Task<ProjectItem> FindByIdAsync(int id)
         {
             return await _context.ProjectItems.FindAsync(id);
         }
 
-        public async Task PutProjectItem(ProjectItem projectItem)
+        public async Task<bool> UpdateItem(ProjectItem projectItem)
         {
+            if (!IsParentValidAsync(projectItem))
+            {
+                return false;
+            }
+            
             _context.Entry(projectItem).State = EntityState.Modified;
 
             try
@@ -46,17 +51,23 @@ namespace WebApi.Repositories.Impl
                     throw;
                 }
             }
+            return true;
         }
 
-        public async Task<int> PostProjectItem(ProjectItem projectItem)
+        public async Task<int> CreateItemAsync(ProjectItem projectItem)
         {
+            if (!IsParentValidAsync(projectItem))
+            {
+                return 0;
+            }
+
             _context.ProjectItems.Add(projectItem);
             await _context.SaveChangesAsync();
 
             return projectItem.Id;
         }
 
-        public async Task<ProjectItem> DeleteProjectItem(int id)
+        public async Task<int> DeleteItemAsync(int id)
         {
             var projectItem = await _context.ProjectItems.FindAsync(id);
             if (projectItem == null)
@@ -65,14 +76,36 @@ namespace WebApi.Repositories.Impl
             }
 
             _context.ProjectItems.Remove(projectItem);
-            await _context.SaveChangesAsync();
-
-            return projectItem;
+            return await _context.SaveChangesAsync();
         }
 
         private bool ProjectItemExists(int id)
         {
             return _context.ProjectItems.Any(e => e.Id == id);
+        }
+
+
+        private async bool IsParentValidAsync(ProjectItem projectItem)
+        {
+            if (projectItem.ParentId.HasValue)
+            {
+                var parent = await FindByIdAsync(projectItem.ParentId.Value);
+
+                if (parent == null)
+                {
+                    throw new NotFoundException("Parent was not found");
+                }
+
+                if (parent.Type == ItemType.Task &&
+                    projectItem.Type == ItemType.Project)
+                {
+                    return false; //Project cann not be child of task
+                }
+
+                //We need to check for cycles here too ...
+                //And all this logic better to exctract to some services layer
+            }
+            return true;
         }
     }
 }

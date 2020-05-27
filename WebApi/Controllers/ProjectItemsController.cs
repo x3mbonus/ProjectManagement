@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Data;
+using WebApi.Exceptions;
+using WebApi.Repositories;
 
 namespace WebApi.Controllers
 {
@@ -11,25 +13,25 @@ namespace WebApi.Controllers
     [ApiController]
     public class ProjectItemsController : ControllerBase
     {
-        private readonly ProjectsDbContext _context;
+        private readonly IProjectItemRepository _projectItemRepository;
 
-        public ProjectItemsController(ProjectsDbContext context)
+        public ProjectItemsController(IProjectItemRepository projectItemRepository)
         {
-            _context = context;
+            _projectItemRepository = projectItemRepository;
         }
 
         // GET: api/ProjectItems
         [HttpGet]
         public async Task<ActionResult<IEnumerable<ProjectItem>>> GetProjectItems()
         {
-            return await _context.ProjectItems.ToListAsync();
+            return await _projectItemRepository.GetItemsAsync();
         }
 
         // GET: api/ProjectItems/5
         [HttpGet("{id}")]
         public async Task<ActionResult<ProjectItem>> GetProjectItem(int id)
         {
-            var projectItem = await _context.ProjectItems.FindAsync(id);
+            var projectItem = await _projectItemRepository.FindByIdAsync(id);
 
             if (projectItem == null)
             {
@@ -44,29 +46,21 @@ namespace WebApi.Controllers
         // more details see https://aka.ms/RazorPagesCRUD.
         [HttpPut("{id}")]
         public async Task<IActionResult> PutProjectItem(int id, ProjectItem projectItem)
-        {
+        {   
+
             if (id != projectItem.Id)
             {
                 return BadRequest();
             }
 
-            _context.Entry(projectItem).State = EntityState.Modified;
-
             try
             {
-                await _context.SaveChangesAsync();
+                await _projectItemRepository.UpdateItem(projectItem);
             }
-            catch (DbUpdateConcurrencyException)
+            catch(NotFoundException ex)
             {
-                if (!ProjectItemExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+                return NotFound();
+            }           
 
             return NoContent();
         }
@@ -75,33 +69,30 @@ namespace WebApi.Controllers
         // To protect from overposting attacks, please enable the specific properties you want to bind to, for
         // more details see https://aka.ms/RazorPagesCRUD.
         [HttpPost]
-        public async Task<ActionResult<ProjectItem>> PostProjectItem(ProjectItem projectItem)
+        public async Task<ActionResult<int>> PostProjectItem(ProjectItem projectItem)
         {
-            _context.ProjectItems.Add(projectItem);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetProjectItem", new { id = projectItem.Id }, projectItem);
+            var id = await _projectItemRepository.CreateItemAsync(projectItem);
+            if (id == 0)
+            {
+                return BadRequest();
+            }
+            return CreatedAtAction("GetProjectItem", new { id }, id);
         }
 
         // DELETE: api/ProjectItems/5
         [HttpDelete("{id}")]
-        public async Task<ActionResult<ProjectItem>> DeleteProjectItem(int id)
+        public async Task<IActionResult> DeleteProjectItem(int id)
         {
-            var projectItem = await _context.ProjectItems.FindAsync(id);
-            if (projectItem == null)
+            try
+            {
+                await _projectItemRepository.DeleteItemAsync(id);
+            }
+            catch (NotFoundException)
             {
                 return NotFound();
             }
 
-            _context.ProjectItems.Remove(projectItem);
-            await _context.SaveChangesAsync();
-
-            return projectItem;
-        }
-
-        private bool ProjectItemExists(int id)
-        {
-            return _context.ProjectItems.Any(e => e.Id == id);
+            return NoContent();
         }
     }
 }
