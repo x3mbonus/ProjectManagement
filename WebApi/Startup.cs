@@ -12,6 +12,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using WebApi.Data;
+using WebApi.Repositories;
+using WebApi.Repositories.Impl;
 
 namespace WebApi
 {
@@ -30,6 +32,8 @@ namespace WebApi
             services.AddDbContext<ProjectsDbContext>(options =>
                 options.UseSqlServer(
                     Configuration.GetConnectionString("DefaultConnection")));
+
+            services.AddScoped<IProjectItemRepository, ProjectItemRepository>();
 
             services.AddControllers();
         }
